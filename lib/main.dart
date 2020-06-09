@@ -121,19 +121,41 @@ class _MyHomePageState extends State<MyHomePage> {
       };
   }
 
+  clearDeviceSystemList() {
+    deviceSystems.forEach((deviceSystem) {
+      deviceSystem.bleDevice?.stopListeningForEvents();
+    });
+    deviceSystems = [];
+  }
+
   updateDeviceSystemList() {
     deviceSystemsStreamController.add(null);
   }
 
   startBleDiscovery() {
-    deviceSystems = [];
+    clearDeviceSystemList();
     updateDeviceSystemList();
-    bluetoothAdapter.getAvailableDevices().forEach(
-      (BluetoothDevice device) {
-        print(device.name);
-        if (device.name == BLE_NAME
-//            || device.type == BluetoothType.LE
-            ) {
+//    bluetoothAdapter.getAvailableDevices().forEach(
+//      (BluetoothDevice device) {
+//        print(device.name);
+//        if (device.name == BLE_NAME) {
+//          int i = deviceSystems.length;
+//          DeviceSystem deviceSystem = DeviceSystem(
+//            name: 'Cognyx(${i + 1})',
+//            bleDevice: device,
+//            status: DeviceSystemStatus.DISCONNECTED,
+//            statusText: 'Disconnected',
+//          );
+//          deviceSystems.add(deviceSystem);
+//          updateDeviceSystemList();
+//        }
+//      },
+//    );
+
+    bluetoothAdapter.startDiscovery().map((eventObj) => (eventObj.extra as BluetoothDevice)).forEach(
+          (BluetoothDevice device) {
+        if (device.name == BLE_NAME) {
+          device.listenForEvents();
           int i = deviceSystems.length;
           DeviceSystem deviceSystem = DeviceSystem(
             name: 'Cognyx(${i + 1})',
@@ -146,6 +168,15 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       },
     );
+
+//    DeviceSystem deviceSystem = DeviceSystem(
+//      name: 'Cognyx(1)',
+//      bleDevice: BLEDevice(name: BLE_NAME, address: 'AA:BB:CC:DD:EE:GG'), /// !!!!!!!,
+//      status: DeviceSystemStatus.DISCONNECTED,
+//      statusText: 'Disconnected',
+//    );
+//    deviceSystems.add(deviceSystem);
+//    updateDeviceSystemList();
   }
 
   startConnectionProcess(DeviceSystem deviceSystem) async {
@@ -187,6 +218,8 @@ class _MyHomePageState extends State<MyHomePage> {
       BLTDevice bltDevice = await bluetoothAdapter.startDiscovery()
           .map((eventObj) => eventObj.extra).firstWhere((device) => device.name == BLT_NAME, orElse: () => null);
 
+//      BLTDevice bltDevice = BLTDevice(name: BLT_NAME, address: 'AA:BB:CC:DD:EE:FF'); /// !!!!!!!
+
       print('Discovering BLT Services...');
       deviceSystem.statusText = 'Discovering BLT Services...';
       updateDeviceSystemList();
@@ -194,6 +227,8 @@ class _MyHomePageState extends State<MyHomePage> {
       deviceSystem.bltDevice = bltDevice;
 
       BLTService bltService = await bltDevice.fetchServices().then((services) => services.firstWhere((service) => service.uuid == BLT_SERVICE_UUID, orElse: () => null));
+      print(bltService.uuid);
+//      BLTService bltService = BLTService(device: bltDevice, uuid: BLT_SERVICE_UUID); /// !!!!!!!
 
       print('Connecting to BLT...');
       deviceSystem.statusText = 'Connecting to BLT...';
@@ -217,8 +252,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 ?.displayMap
                 ?.toString() ?? bytes.toString();
           }).where((s) {
-//            print('s: $s');
-//            print('s != null: ${s != null}');
             return s != null;
           });
         });
@@ -237,7 +270,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   disconnectBLT(DeviceSystem deviceSystem) {
-    deviceSystem.bltDevice.connectedService.disconnect();
+//    deviceSystem.bltDevice.connectedService.disconnect();
+    bltConnection.close();
+    deviceSystem.bleDevice?.stopListeningForEvents();
     deviceSystems.removeWhere((_deviceSystem) => _deviceSystem.bltDevice.address == deviceSystem.bltDevice.address);
     updateDeviceSystemList();
   }
@@ -289,6 +324,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             alignment: Alignment.centerRight,
                             child: GestureDetector(
                               onTap: () {
+                                bluetoothAdapter.stopDiscovery();
                                 startBleDiscovery();
                               },
                               child: Icon(
